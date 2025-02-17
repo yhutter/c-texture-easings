@@ -13,24 +13,14 @@ typedef struct {
     float size;
 } penger_t;
 
-void render_penger(SDL_Renderer* renderer, penger_t* penger) {
-    SDL_SetRenderDrawColor(renderer, 0xff, 0xdd, 0x33, 0xff);
-    SDL_FRect penger_rect = {
-        .x = penger->pos.x,
-        .y = penger->pos.y,
-        .w = penger->size,
-        .h = penger->size
-    };
-    SDL_RenderFillRect(renderer, &penger_rect);
-}
-
-
 //////////////////////////
 /// Global Variables
 /////////////////////////
 bool running = false;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
+SDL_Texture* texture = NULL;
+SDL_Surface* surface = NULL;
 Uint64 start_time = 0;
 Uint64 current_time = 0;
 float current_time_seconds = 0.0f;
@@ -40,7 +30,7 @@ int screen_height = 720;
 
 #define FPS 60
 #define TARGET_FRAME_TIME (1000 / FPS)
-#define SCALE_SIZE 50.0f
+#define SCALE_SIZE 128.0f
 
 //////////////////////////
 /// Vector Utilities
@@ -111,12 +101,29 @@ bool initialize(void) {
         SDL_Log("ERROR: Could not create SDL window and renderer: '%s'\n", SDL_GetError());
         return false;
     } 
+
+    const char* texture_path = "./assets/penger.bmp";
+    surface = SDL_LoadBMP(texture_path);
+    if (surface == NULL) {
+        SDL_Log("ERROR: Could not surface '%s'\n", texture_path);
+        return false;
+    }
+
+    texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture == NULL) {
+        SDL_Log("ERROR: Could not create texture from surface '%s'\n", SDL_GetError());
+        return false;
+    }
+    
+    // Do not interpolate pixels
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
     // Set VSync on in order to get rid of screen tearing.
     SDL_SetRenderVSync(renderer, 1);
     start_time = SDL_GetTicks();
 
     penger = (penger_t) {
-        .size = 20.0f,
+        .size = SCALE_SIZE,
         .pos = {
             .x = screen_width / 2.0f,
             .y = screen_height / 2.0f
@@ -154,6 +161,7 @@ void update(void) {
         SDL_Delay(time_to_wait);
     }
     start_time = current_time;
+
     float t  = remap(sinf(current_time_seconds), -1.0f, 1.0f, 0.0f, 1.0f);
     penger.size = ease_out_sine(t) * SCALE_SIZE;
 
@@ -170,14 +178,32 @@ void update(void) {
     penger.pos = new_pos;
 }
 
+void render_penger(penger_t* penger) {
+    float t = remap(sinf(current_time_seconds), -1.0f, 1.0, 0.0f, 1.0f);
+    float angle = remap(t, 0.0f, 1.0f, 0.0f, 360.0f);
+
+    SDL_FRect penger_rect = {
+        .x = penger->pos.x,
+        .y = penger->pos.y,
+        .w = penger->size,
+        .h = penger->size
+    };
+    SDL_SetTextureColorModFloat(texture, t, t, t);
+    // SDL_RenderTexture(renderer, texture, NULL, &penger_rect);
+    SDL_RenderTextureRotated(renderer, texture, NULL, &penger_rect, angle, NULL, 0);
+}
+
 void render(void) {
     SDL_SetRenderDrawColor(renderer, 0x18, 0x18, 0x18, 0xff);
     SDL_RenderClear(renderer);
-    render_penger(renderer, &penger);
+    render_penger(&penger);
     SDL_RenderPresent(renderer);
 }
 
+
 void destroy(void) {
+    SDL_DestroyTexture(texture);
+    SDL_DestroySurface(surface);
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
