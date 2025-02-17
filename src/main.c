@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <stdbool.h>
+#include <math.h>
 
 typedef struct {
     float x;
@@ -10,20 +11,40 @@ typedef struct {
     vec2_t pos;
     vec2_t vel;
     float size;
-} player_t;
+} penger_t;
 
+void render_penger(SDL_Renderer* renderer, penger_t* penger) {
+    SDL_SetRenderDrawColor(renderer, 0xff, 0xdd, 0x33, 0xff);
+    SDL_FRect penger_rect = {
+        .x = penger->pos.x,
+        .y = penger->pos.y,
+        .w = penger->size,
+        .h = penger->size
+    };
+    SDL_RenderFillRect(renderer, &penger_rect);
+}
+
+
+//////////////////////////
+/// Global Variables
+/////////////////////////
 bool running = false;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
 Uint64 start_time = 0;
 Uint64 current_time = 0;
-player_t player = {0};
+float current_time_seconds = 0.0f;
+penger_t penger = {0};
 int screen_width = 1280;
 int screen_height = 720;
 
 #define FPS 60
 #define TARGET_FRAME_TIME (1000 / FPS)
+#define SCALE_SIZE 50.0f
 
+//////////////////////////
+/// Vector Utilities
+/////////////////////////
 static inline vec2_t vec2_add(vec2_t a, vec2_t b) {
     vec2_t result = {
         .x = a.x + b.x,
@@ -56,11 +77,31 @@ static inline vec2_t vec2_scale_x(vec2_t a, float scale) {
     return result;
 }
 
-static inline vec2_t vec2_zero(void) {
-    vec2_t result = {0};
-    return result;
+//////////////////////////
+/// Math Utilities
+/////////////////////////
+static inline float remap(float value, float in_min, float in_max, float out_min, float out_max) {
+    float in_range = in_max - in_min;
+    float out_range = out_max - out_min;
+    float percentage = (value - in_min) / in_range;
+    return out_min + (out_range * percentage);
 }
 
+
+//////////////////////////
+/// Easing Functions
+/////////////////////////
+static inline float ease_in_sine(float t) {
+    return 1.0f - cosf((t * M_PI) / 2.0f);
+}
+
+static inline float ease_out_sine(float t) {
+    return sinf((t * M_PI) / 2.0f);;
+}
+
+//////////////////////////
+/// Game Loop Functions
+/////////////////////////
 bool initialize(void) {
     if(!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) {
         SDL_Log("ERROR: Could not initialize SDL: '%s'\n", SDL_GetError());
@@ -69,10 +110,12 @@ bool initialize(void) {
     if(!SDL_CreateWindowAndRenderer("Texture Easings", screen_width, screen_height, 0, &window, &renderer)) {
         SDL_Log("ERROR: Could not create SDL window and renderer: '%s'\n", SDL_GetError());
         return false;
-    }
+    } 
+    // Set VSync on in order to get rid of screen tearing.
+    SDL_SetRenderVSync(renderer, 1);
     start_time = SDL_GetTicks();
 
-    player = (player_t) {
+    penger = (penger_t) {
         .size = 20.0f,
         .pos = {
             .x = screen_width / 2.0f,
@@ -105,37 +148,32 @@ void process(void) {
 void update(void) {
     current_time = SDL_GetTicks();
     Uint64 delta_time = current_time - start_time;
+    current_time_seconds += delta_time * 0.001f;
     int time_to_wait = TARGET_FRAME_TIME - delta_time;
     if (time_to_wait > 0 && time_to_wait <= TARGET_FRAME_TIME) {
         SDL_Delay(time_to_wait);
     }
     start_time = current_time;
+    float t  = remap(sinf(current_time_seconds), -1.0f, 1.0f, 0.0f, 1.0f);
+    penger.size = ease_out_sine(t) * SCALE_SIZE;
 
-    float scale = delta_time * 0.12f;
-    vec2_t new_pos = vec2_add(player.pos, vec2_scale(player.vel, scale)); 
-    if (new_pos.y <= 0 || (new_pos.y + player.size)  > screen_height) {
-        player.vel = vec2_scale_y(player.vel, -1.0f);
+    float vel_scale = delta_time * 0.12f;
+    vec2_t new_pos = vec2_add(penger.pos, vec2_scale(penger.vel, vel_scale)); 
+    if (new_pos.y <= 0 || (new_pos.y + penger.size)  > screen_height) {
+        penger.vel = vec2_scale_y(penger.vel, -1.0f);
         return;
     }
-    if (new_pos.x <= 0 || (new_pos.x + player.size) > screen_width) {
-        player.vel = vec2_scale_x(player.vel, -1.0f);
+    if (new_pos.x <= 0 || (new_pos.x + penger.size) > screen_width) {
+        penger.vel = vec2_scale_x(penger.vel, -1.0f);
         return;
     }
-    player.pos = new_pos;
+    penger.pos = new_pos;
 }
 
 void render(void) {
     SDL_SetRenderDrawColor(renderer, 0x18, 0x18, 0x18, 0xff);
     SDL_RenderClear(renderer);
-
-    SDL_SetRenderDrawColor(renderer, 0xff, 0xdd, 0x33, 0xff);
-    SDL_FRect player_rect = {
-        .x = player.pos.x,
-        .y = player.pos.y,
-        .w = player.size,
-        .h = player.size
-    };
-    SDL_RenderFillRect(renderer, &player_rect);
+    render_penger(renderer, &penger);
     SDL_RenderPresent(renderer);
 }
 
