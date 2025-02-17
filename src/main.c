@@ -24,7 +24,7 @@ int screen_height = 720;
 #define FPS 60
 #define TARGET_FRAME_TIME (1000 / FPS)
 
-vec2_t vec2_add(vec2_t a, vec2_t b) {
+static inline vec2_t vec2_add(vec2_t a, vec2_t b) {
     vec2_t result = {
         .x = a.x + b.x,
         .y = a.y + b.y
@@ -32,11 +32,32 @@ vec2_t vec2_add(vec2_t a, vec2_t b) {
     return result;
 }
 
-vec2_t vec2_scale(vec2_t a, float scale) {
+static inline vec2_t vec2_scale(vec2_t a, float scale) {
     vec2_t result = {
         .x = a.x * scale,
         .y = a.y * scale 
     };
+    return result;
+}
+
+static inline vec2_t vec2_scale_y(vec2_t a, float scale) {
+    vec2_t result = {
+        .x = a.x,
+        .y = a.y * scale 
+    };
+    return result;
+}
+
+static inline vec2_t vec2_scale_x(vec2_t a, float scale) {
+    vec2_t result = {
+        .x = a.x * scale,
+        .y = a.y 
+    };
+    return result;
+}
+
+static inline vec2_t vec2_zero(void) {
+    vec2_t result = {0};
     return result;
 }
 
@@ -51,14 +72,16 @@ bool initialize(void) {
     }
     start_time = SDL_GetTicks();
 
-    player.pos = (vec2_t) {
-        .x = screen_width / 2.0f,
-        .y = screen_height / 2.0f
-    };
-    player.size = 20.0f;
-    player.vel = (vec2_t) {
-        .x = 0.0f,
-        .y = 5.0f
+    player = (player_t) {
+        .size = 20.0f,
+        .pos = {
+            .x = screen_width / 2.0f,
+            .y = screen_height / 2.0f
+        },
+        .vel = {
+            .x = 4.0f,
+            .y = 4.0f
+        }
     };
     return true;
 }
@@ -86,13 +109,19 @@ void update(void) {
     if (time_to_wait > 0 && time_to_wait <= TARGET_FRAME_TIME) {
         SDL_Delay(time_to_wait);
     }
-
-    player.pos = vec2_add(player.pos, vec2_scale(player.vel, delta_time * 0.15f));
-
-    if (player.pos.y > screen_height) {
-        player.pos.y = 0;
-    }
     start_time = current_time;
+
+    float scale = delta_time * 0.12f;
+    vec2_t new_pos = vec2_add(player.pos, vec2_scale(player.vel, scale)); 
+    if (new_pos.y <= 0 || (new_pos.y + player.size)  > screen_height) {
+        player.vel = vec2_scale_y(player.vel, -1.0f);
+        return;
+    }
+    if (new_pos.x <= 0 || (new_pos.x + player.size) > screen_width) {
+        player.vel = vec2_scale_x(player.vel, -1.0f);
+        return;
+    }
+    player.pos = new_pos;
 }
 
 void render(void) {
