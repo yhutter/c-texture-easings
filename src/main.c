@@ -257,7 +257,6 @@ void update(void) {
 
 
 void render_penger(penger_t* penger) {
-    float t = remap(sinf(current_time_seconds), -1.0f, 1.0, 0.0f, 1.0f);
     SDL_FRect penger_rect = {
         .x = penger->pos.x,
         .y = penger->pos.y,
@@ -265,7 +264,11 @@ void render_penger(penger_t* penger) {
         .h = penger->size
     };
     if (penger->shiny) {
-        SDL_SetTextureColorModFloat(penger->texture, t, t, 0);
+        // https://examples.libsdl.org/SDL3/renderer/11-color-mods/
+        float r = (float) (0.5 + 0.5 * SDL_sin(current_time_seconds));
+        float g = (float) (0.5 + 0.5 * SDL_sin(current_time_seconds + SDL_PI_D * 2 / 3));
+        float b = (float) (0.5 + 0.5 * SDL_sin(current_time_seconds + SDL_PI_D * 4 / 3));
+        SDL_SetTextureColorModFloat(penger->texture, r, g, b);
     }
     SDL_RenderTextureRotated(renderer, penger->texture, NULL, &penger_rect, penger->angle, NULL, 0);
 }
