@@ -9,6 +9,16 @@
 #define MAX_PENGERS 512 
 #define SHINY_CHANCE 3
 
+typedef enum {
+    githubger,
+    goldger,
+    malger,
+    michaelger,
+    pengachu,
+    penger,
+    count
+} penger_type;
+
 typedef struct {
     float x;
     float y;
@@ -23,23 +33,7 @@ typedef struct {
     SDL_Texture* texture;
 } penger_t;
 
-penger_t create_penger(float x, float y) {
-    bool shiny = rand() % SHINY_CHANCE == (SHINY_CHANCE - 1);
-    penger_t penger = {
-        .size = PENGER_SCALE_SIZE,
-        .pos = {
-            .x = x,
-            .y = y 
-        },
-        .vel = {
-            .x = 4.0f,
-            .y = 4.0f
-        },
-        .texture = NULL,
-        .shiny = shiny
-    };
-    return penger;
-}
+
 
 //////////////////////////
 /// Global Variables
@@ -74,6 +68,51 @@ SDL_Texture* load_texture(const char* texture_path) {
     // Do not interpolate pixels
     SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
     return texture;
+}
+
+//////////////////////////
+/// Struct Creation
+/////////////////////////
+penger_t create_penger(float x, float y) {
+    bool shiny = rand() % SHINY_CHANCE == (SHINY_CHANCE - 1);
+    penger_type type_count = count;
+    penger_type random_type = rand() % type_count;
+    SDL_Texture* texture = NULL;
+    switch (random_type) {
+        case githubger:
+            texture = load_texture("./assets/githubger.bmp");
+            break;
+        case goldger:
+            texture = load_texture("./assets/goldger.bmp");
+            break;
+        case malger:
+            texture = load_texture("./assets/malger.bmp");
+            break;
+        case michaelger:
+            texture = load_texture("./assets/michaelger.bmp");
+            break;
+        case pengachu:
+            texture = load_texture("./assets/pengachu.bmp");
+            break;
+        case penger:
+            texture = load_texture("./assets/penger.bmp");
+            break;
+    }
+
+    penger_t penger = {
+        .size = PENGER_SCALE_SIZE,
+        .pos = {
+            .x = x,
+            .y = y 
+        },
+        .vel = {
+            .x = 4.0f,
+            .y = 4.0f
+        },
+        .texture = texture,
+        .shiny = shiny
+    };
+    return penger;
 }
 
 //////////////////////////
@@ -208,7 +247,6 @@ void update(void) {
         float mouse_y;
         SDL_GetMouseState(&mouse_x, &mouse_y);
         penger_t penger = create_penger(mouse_x, mouse_y);
-        penger.texture = load_texture("./assets/penger.bmp");
         pengers[num_pengers++] = penger;
     }
     for (int i = 0; i < num_pengers; i++) {
