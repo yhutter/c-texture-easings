@@ -1,11 +1,13 @@
 #include <SDL3/SDL.h>
 #include <stdbool.h>
+#include <stdlib.h>
 #include <math.h>
 
 #define FPS 60
 #define TARGET_FRAME_TIME (1000 / FPS)
 #define PENGER_SCALE_SIZE 64.0f
 #define MAX_PENGERS 512 
+#define SHINY_CHANCE 3
 
 typedef struct {
     float x;
@@ -17,9 +19,12 @@ typedef struct {
     vec2_t vel;
     float size;
     float angle;
+    bool shiny;
+    SDL_Texture* texture;
 } penger_t;
 
 penger_t create_penger(float x, float y) {
+    bool shiny = rand() % SHINY_CHANCE == (SHINY_CHANCE - 1);
     penger_t penger = {
         .size = PENGER_SCALE_SIZE,
         .pos = {
@@ -29,7 +34,9 @@ penger_t create_penger(float x, float y) {
         .vel = {
             .x = 4.0f,
             .y = 4.0f
-        }
+        },
+        .texture = NULL,
+        .shiny = shiny
     };
     return penger;
 }
@@ -40,8 +47,6 @@ penger_t create_penger(float x, float y) {
 bool running = false;
 SDL_Window* window = NULL;
 SDL_Renderer* renderer = NULL;
-SDL_Texture* texture = NULL;
-SDL_Surface* surface = NULL;
 Uint64 start_time = 0;
 Uint64 current_time = 0;
 float current_time_seconds = 0.0f;
@@ -50,6 +55,26 @@ int screen_width = 1280;
 int screen_height = 720;
 int num_pengers = 0;
 bool mouse_down = false;
+
+//////////////////////////
+/// Image Utilities
+/////////////////////////
+SDL_Texture* load_texture(const char* texture_path) {
+    SDL_Surface* surface = SDL_LoadBMP(texture_path);
+    if (surface == NULL) {
+        SDL_Log("ERROR: Could not create surface for '%s' because of '%s'\n", texture_path, SDL_GetError());
+        return NULL;
+    }
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    if (texture == NULL) {
+        SDL_DestroySurface(surface);
+        SDL_Log("ERROR: Could not create texture from surface because of '%s'\n", SDL_GetError());
+        return NULL;
+    }
+    // Do not interpolate pixels
+    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+    return texture;
+}
 
 //////////////////////////
 /// Vector Utilities
@@ -121,22 +146,6 @@ bool initialize(void) {
         return false;
     } 
 
-    const char* texture_path = "./assets/penger.bmp";
-    surface = SDL_LoadBMP(texture_path);
-    if (surface == NULL) {
-        SDL_Log("ERROR: Could not surface '%s'\n", texture_path);
-        return false;
-    }
-
-    texture = SDL_CreateTextureFromSurface(renderer, surface);
-    if (texture == NULL) {
-        SDL_Log("ERROR: Could not create texture from surface '%s'\n", SDL_GetError());
-        return false;
-    }
-    
-    // Do not interpolate pixels
-    SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
-
     // Set VSync on in order to get rid of screen tearing.
     SDL_SetRenderVSync(renderer, 1);
     start_time = SDL_GetTicks();
@@ -198,7 +207,9 @@ void update(void) {
         float mouse_x;
         float mouse_y;
         SDL_GetMouseState(&mouse_x, &mouse_y);
-        pengers[num_pengers++] = create_penger(mouse_x, mouse_y);
+        penger_t penger = create_penger(mouse_x, mouse_y);
+        penger.texture = load_texture("./assets/penger.bmp");
+        pengers[num_pengers++] = penger;
     }
     for (int i = 0; i < num_pengers; i++) {
         penger_t* penger = &pengers[i];
@@ -215,8 +226,10 @@ void render_penger(penger_t* penger) {
         .w = penger->size,
         .h = penger->size
     };
-    SDL_SetTextureColorModFloat(texture, t, t, t);
-    SDL_RenderTextureRotated(renderer, texture, NULL, &penger_rect, penger->angle, NULL, 0);
+    if (penger->shiny) {
+        SDL_SetTextureColorModFloat(penger->texture, t, t, 0);
+    }
+    SDL_RenderTextureRotated(renderer, penger->texture, NULL, &penger_rect, penger->angle, NULL, 0);
 }
 
 void render(void) {
@@ -231,8 +244,9 @@ void render(void) {
 
 
 void destroy(void) {
-    SDL_DestroyTexture(texture);
-    SDL_DestroySurface(surface);
+    for (int i = 0; i < num_pengers; i++) {
+        SDL_DestroyTexture(pengers[i].texture);
+    }
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
